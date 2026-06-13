@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../viewmodels/cards_viewmodel.dart';
 import '../models/flashcard.dart';
+import '../services/ai_template_service.dart';
+import '../services/card_import_service.dart';
+import '../services/database_service.dart';
 import '../components/feedback/app_loading.dart';
 import '../components/feedback/app_error.dart';
 import '../components/theme/app_colors.dart';
@@ -33,6 +37,58 @@ class _CardListViewState extends State<CardListView> {
         backgroundColor: AppColors.surface,
         elevation: 0,
         foregroundColor: AppColors.textPrimary,
+        actions: [
+          PopupMenuButton<_CardListAction>(
+            icon: const Icon(Icons.more_vert_rounded),
+            tooltip: 'Más opciones',
+            color: AppColors.surface,
+            onSelected: (action) {
+              switch (action) {
+                case _CardListAction.importJsonFromClipboard:
+                  _importJsonFromClipboard(context);
+                case _CardListAction.copyAiTemplate:
+                  _copyAiTemplate(context);
+              }
+            },
+            itemBuilder:
+                (context) => [
+                  PopupMenuItem(
+                    value: _CardListAction.importJsonFromClipboard,
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.file_upload_outlined,
+                          size: 20,
+                          color: AppColors.textSecondary,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Import JSON from clipboard',
+                          style: AppTextStyles.bodyMedium,
+                        ),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: _CardListAction.copyAiTemplate,
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.content_copy_rounded,
+                          size: 20,
+                          color: AppColors.textSecondary,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Copy AI template',
+                          style: AppTextStyles.bodyMedium,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+          ),
+        ],
       ),
       body: Consumer<CardsViewModel>(
         builder: (context, viewModel, child) {
@@ -201,6 +257,64 @@ class _CardListViewState extends State<CardListView> {
     });
   }
 
+  Future<void> _copyAiTemplate(BuildContext context) async {
+    await Clipboard.setData(
+      const ClipboardData(text: AiTemplateService.vocabularyJsonPrompt),
+    );
+
+    if (!context.mounted) return;
+    _showSnackBar(context, 'AI template copied', seconds: 2);
+  }
+
+  Future<void> _importJsonFromClipboard(BuildContext context) async {
+    final dbService = context.read<DatabaseService>();
+    final cardsViewModel = context.read<CardsViewModel>();
+    final clipboardData = await Clipboard.getData(Clipboard.kTextPlain);
+    final jsonText = clipboardData?.text?.trim();
+
+    if (jsonText == null || jsonText.isEmpty) {
+      if (!context.mounted) return;
+      _showSnackBar(context, 'Clipboard is empty');
+      return;
+    }
+
+    try {
+      final result = await CardImportService(
+        dbService,
+      ).importFromJsonText(jsonText);
+
+      if (!context.mounted) return;
+
+      await cardsViewModel.loadCards();
+      if (!context.mounted) return;
+
+      _showSnackBar(
+        context,
+        'Imported: ${result.imported} · Duplicates: ${result.skippedDuplicates} · Invalid: ${result.skippedInvalid}',
+      );
+    } on FormatException {
+      if (!context.mounted) return;
+      _showSnackBar(context, 'This is not valid JSON');
+    } on CardImportException {
+      if (!context.mounted) return;
+      _showSnackBar(context, 'This file is not a valid vocabulary import file');
+    }
+  }
+
+  void _showSnackBar(BuildContext context, String message, {int seconds = 3}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          style: const TextStyle(color: AppColors.textPrimary),
+        ),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: AppColors.surfaceVariant,
+        duration: Duration(seconds: seconds),
+      ),
+    );
+  }
+
   void _navigateToEditCard(BuildContext context, Flashcard card) {
     final cardsVm = context.read<CardsViewModel>();
     Navigator.push(
@@ -244,3 +358,5 @@ class _CardListViewState extends State<CardListView> {
     );
   }
 }
+
+enum _CardListAction { importJsonFromClipboard, copyAiTemplate }

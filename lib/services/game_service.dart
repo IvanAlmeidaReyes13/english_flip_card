@@ -6,6 +6,7 @@ class GameService {
 
   Flashcard? _currentCard;
   bool _isFlipped = false;
+  bool _isCurrentCardReversed = false;
   int _streak = 0;
   int _bestStreak = 0;
   final Set<String> _seenCardIds = {};
@@ -26,6 +27,7 @@ class GameService {
   Future<void> loadNextCard() async {
     _currentCard = await _getNextCard();
     _isFlipped = false;
+    _isCurrentCardReversed = _shouldReverseCard(_currentCard);
 
     if (_currentCard == null) {
       _sessionComplete = true;
@@ -66,6 +68,11 @@ class GameService {
     }
 
     return pool.last;
+  }
+
+  bool _shouldReverseCard(Flashcard? card) {
+    if (card == null) return false;
+    return card.knowledgeLevel >= 50 && card.knowledgeLevel < 100;
   }
 
   void flipCard() {
@@ -115,6 +122,7 @@ class GameService {
 
   Flashcard? get currentCard => _currentCard;
   bool get isFlipped => _isFlipped;
+  bool get isCurrentCardReversed => _isCurrentCardReversed;
   int get streak => _streak;
   int get bestStreak => _bestStreak;
   bool get sessionComplete => _sessionComplete;

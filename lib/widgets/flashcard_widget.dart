@@ -9,6 +9,7 @@ class FlashcardWidget extends StatefulWidget {
   final String? noteText;
   final Color cardColor;
   final int mastery;
+  final bool isReversed;
   final VoidCallback? onSwipeLeft;
   final VoidCallback? onSwipeRight;
   final VoidCallback? onTap;
@@ -20,6 +21,7 @@ class FlashcardWidget extends StatefulWidget {
     this.noteText,
     required this.cardColor,
     required this.mastery,
+    required this.isReversed,
     this.onSwipeLeft,
     this.onSwipeRight,
     this.onTap,
@@ -235,7 +237,27 @@ class _FlashcardWidgetState extends State<FlashcardWidget>
               child: Container(height: 4, color: widget.cardColor),
             ),
             Padding(padding: const EdgeInsets.all(24), child: child),
+            if (widget.isReversed)
+              Positioned(top: 16, right: 16, child: _buildReverseBadge()),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReverseBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppColors.reverse.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.reverse.withValues(alpha: 0.30)),
+      ),
+      child: Text(
+        'ES → EN',
+        style: AppTextStyles.caption.copyWith(
+          color: AppColors.reverse,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );

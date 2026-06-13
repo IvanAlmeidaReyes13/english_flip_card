@@ -20,6 +20,7 @@ class GameViewModel extends ChangeNotifier {
 
   Flashcard? get currentCard => _gameService.currentCard;
   bool get isFlipped => _gameService.isFlipped;
+  bool get isCurrentCardReversed => _gameService.isCurrentCardReversed;
   int get streak => _gameService.streak;
   int get bestStreak => _gameService.bestStreak;
   bool get sessionComplete => _gameService.sessionComplete;

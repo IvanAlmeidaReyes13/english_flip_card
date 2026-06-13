@@ -87,12 +87,21 @@ class _GameViewState extends State<GameView> with WidgetsBindingObserver {
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(20, 10, 20, 8),
                       child: FlashcardWidget(
-                        key: ValueKey(card.id),
-                        frontText: card.english,
-                        backText: card.spanish,
+                        key: ValueKey(
+                          '${card.id}-${viewModel.isCurrentCardReversed}',
+                        ),
+                        frontText:
+                            viewModel.isCurrentCardReversed
+                                ? card.spanish
+                                : card.english,
+                        backText:
+                            viewModel.isCurrentCardReversed
+                                ? card.english
+                                : card.spanish,
                         noteText: card.notes,
                         cardColor: cardColor,
                         mastery: card.knowledgeLevel,
+                        isReversed: viewModel.isCurrentCardReversed,
                         onSwipeLeft: () => viewModel.swipeLeft(),
                         onSwipeRight: () => viewModel.swipeRight(),
                         onTap: () => viewModel.flipCard(),
