@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../viewmodels/game_viewmodel.dart';
@@ -86,25 +88,28 @@ class _GameViewState extends State<GameView> with WidgetsBindingObserver {
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(20, 10, 20, 8),
-                      child: FlashcardWidget(
-                        key: ValueKey(
-                          '${card.id}-${viewModel.isCurrentCardReversed}',
+                      child: AbsorbPointer(
+                        absorbing: viewModel.isAnswering,
+                        child: FlashcardWidget(
+                          key: ValueKey(
+                            '${card.id}-${viewModel.isCurrentCardReversed}',
+                          ),
+                          frontText:
+                              viewModel.isCurrentCardReversed
+                                  ? card.spanish
+                                  : card.english,
+                          backText:
+                              viewModel.isCurrentCardReversed
+                                  ? card.english
+                                  : card.spanish,
+                          noteText: card.notes,
+                          cardColor: cardColor,
+                          mastery: card.knowledgeLevel,
+                          isReversed: viewModel.isCurrentCardReversed,
+                          onSwipeLeft: () => viewModel.swipeLeft(),
+                          onSwipeRight: () => viewModel.swipeRight(),
+                          onTap: () => viewModel.flipCard(),
                         ),
-                        frontText:
-                            viewModel.isCurrentCardReversed
-                                ? card.spanish
-                                : card.english,
-                        backText:
-                            viewModel.isCurrentCardReversed
-                                ? card.english
-                                : card.spanish,
-                        noteText: card.notes,
-                        cardColor: cardColor,
-                        mastery: card.knowledgeLevel,
-                        isReversed: viewModel.isCurrentCardReversed,
-                        onSwipeLeft: () => viewModel.swipeLeft(),
-                        onSwipeRight: () => viewModel.swipeRight(),
-                        onTap: () => viewModel.flipCard(),
                       ),
                     ),
                   ),
@@ -120,6 +125,8 @@ class _GameViewState extends State<GameView> with WidgetsBindingObserver {
                   child: _buildTutorial(viewModel),
                 ),
               if (viewModel.animateStreak) _buildStreakAnimation(viewModel),
+              if (viewModel.showMasteryCelebration)
+                MasteryCelebration(cardLabel: viewModel.masteredCardLabel),
             ],
           );
         },
@@ -193,7 +200,8 @@ class _GameViewState extends State<GameView> with WidgetsBindingObserver {
         children: [
           Expanded(
             child: OutlinedButton.icon(
-              onPressed: () => viewModel.swipeLeft(),
+              onPressed:
+                  viewModel.isAnswering ? null : () => viewModel.swipeLeft(),
               icon: const Icon(Icons.close_rounded),
               label: const Text('Repasar'),
               style: OutlinedButton.styleFrom(
@@ -209,7 +217,8 @@ class _GameViewState extends State<GameView> with WidgetsBindingObserver {
           const SizedBox(width: 12),
           Expanded(
             child: FilledButton.icon(
-              onPressed: () => viewModel.swipeRight(),
+              onPressed:
+                  viewModel.isAnswering ? null : () => viewModel.swipeRight(),
               icon: const Icon(Icons.check_rounded),
               label: const Text('Lo sé'),
               style: FilledButton.styleFrom(
@@ -243,8 +252,9 @@ class _GameViewState extends State<GameView> with WidgetsBindingObserver {
             Text('No hay tarjetas disponibles', style: AppTextStyles.heading3),
             const SizedBox(height: 8),
             Text(
-              'Añade tarjetas para comenzar a jugar',
+              'Añade una tarjeta o restaura una desde Dominadas',
               style: AppTextStyles.bodyMedium,
+              textAlign: TextAlign.center,
             ),
           ],
         ),
@@ -453,5 +463,166 @@ class _GameViewState extends State<GameView> with WidgetsBindingObserver {
         ),
       ),
     );
+  }
+}
+
+class MasteryCelebration extends StatefulWidget {
+  final String? cardLabel;
+
+  const MasteryCelebration({super.key, this.cardLabel});
+
+  @override
+  State<MasteryCelebration> createState() => _MasteryCelebrationState();
+}
+
+class _MasteryCelebrationState extends State<MasteryCelebration>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1300),
+    )..forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, child) {
+            final value = Curves.easeOut.transform(_controller.value);
+            return Stack(
+              children: [
+                CustomPaint(
+                  size: Size.infinite,
+                  painter: _ConfettiPainter(progress: value),
+                ),
+                Center(
+                  child: Opacity(
+                    opacity: (1 - _controller.value).clamp(0.0, 1.0),
+                    child: Transform.scale(
+                      scale: 0.8 + (math.sin(value * math.pi) * 0.25),
+                      child: Container(
+                        margin: const EdgeInsets.all(24),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 28,
+                          vertical: 20,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.success,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.success.withValues(alpha: 0.35),
+                              blurRadius: 24,
+                              spreadRadius: 4,
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.workspace_premium_rounded,
+                              color: Colors.white,
+                              size: 42,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              '¡Tarjeta dominada!',
+                              style: AppTextStyles.heading2.copyWith(
+                                color: Colors.white,
+                              ),
+                            ),
+                            if (widget.cardLabel != null) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                widget.cardLabel!,
+                                style: AppTextStyles.bodyMedium.copyWith(
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _ConfettiPainter extends CustomPainter {
+  final double progress;
+
+  const _ConfettiPainter({required this.progress});
+
+  static const _colors = [
+    AppColors.primary,
+    AppColors.secondary,
+    AppColors.success,
+    AppColors.warning,
+    AppColors.info,
+    Colors.pinkAccent,
+  ];
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height * 0.42);
+    final paint = Paint();
+
+    for (var index = 0; index < 70; index++) {
+      final angle = (index / 70) * math.pi * 2;
+      final spread = 80 + (index % 9) * 22;
+      final gravity = progress * progress * size.height * 0.45;
+      final position = Offset(
+        center.dx + math.cos(angle) * spread * progress,
+        center.dy + math.sin(angle) * spread * progress + gravity,
+      );
+      final rotation = angle + progress * math.pi * 4;
+      final particleSize = 5.0 + (index % 4);
+
+      paint.color = _colors[index % _colors.length].withValues(
+        alpha: (1 - progress * 0.65).clamp(0.0, 1.0),
+      );
+
+      canvas.save();
+      canvas.translate(position.dx, position.dy);
+      canvas.rotate(rotation);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromCenter(
+            center: Offset.zero,
+            width: particleSize,
+            height: particleSize * 1.8,
+          ),
+          const Radius.circular(2),
+        ),
+        paint,
+      );
+      canvas.restore();
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ConfettiPainter oldDelegate) {
+    return oldDelegate.progress != progress;
   }
 }

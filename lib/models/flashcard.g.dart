@@ -22,6 +22,7 @@ class FlashcardAdapter extends TypeAdapter<Flashcard> {
       spanish: fields[2] as String,
       knowledgeLevel: fields[3] as int,
       notes: fields[4] as String?,
+      isCompleted: fields[6] == null ? false : fields[6] as bool,
       colorIndex: fields[5] as int?,
     );
   }
@@ -29,7 +30,7 @@ class FlashcardAdapter extends TypeAdapter<Flashcard> {
   @override
   void write(BinaryWriter writer, Flashcard obj) {
     writer
-      ..writeByte(6)
+      ..writeByte(7)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -41,7 +42,9 @@ class FlashcardAdapter extends TypeAdapter<Flashcard> {
       ..writeByte(4)
       ..write(obj.notes)
       ..writeByte(5)
-      ..write(obj.colorIndex);
+      ..write(obj.colorIndex)
+      ..writeByte(6)
+      ..write(obj.isCompleted);
   }
 
   @override

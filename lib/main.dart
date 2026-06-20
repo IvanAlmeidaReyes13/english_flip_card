@@ -90,6 +90,8 @@ class _MainNavigationState extends State<MainNavigation> {
           });
           if (index == 0) {
             context.read<GameViewModel>().refreshCards();
+          } else if (index == 1) {
+            context.read<CardsViewModel>().loadCards();
           }
         },
         destinations: const [
