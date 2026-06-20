@@ -7,28 +7,32 @@ part 'flashcard.g.dart';
 class Flashcard extends HiveObject {
   @HiveField(0)
   final String id;
-  
+
   @HiveField(1)
   final String english;
-  
+
   @HiveField(2)
   final String spanish;
-  
+
   @HiveField(3)
   final int knowledgeLevel;
-  
+
   @HiveField(4)
   final String? notes;
-  
+
   @HiveField(5)
   final int colorIndex;
 
+  @HiveField(6, defaultValue: false)
+  final bool isCompleted;
+
   Flashcard({
     String? id,
-    required this.english, 
-    required this.spanish, 
+    required this.english,
+    required this.spanish,
     this.knowledgeLevel = 0,
     this.notes,
+    this.isCompleted = false,
     int? colorIndex,
   }) : id = id ?? const Uuid().v4(),
        colorIndex = colorIndex ?? (DateTime.now().millisecondsSinceEpoch % 8);
@@ -40,6 +44,7 @@ class Flashcard extends HiveObject {
     int? knowledgeLevel,
     String? notes,
     int? colorIndex,
+    bool? isCompleted,
   }) {
     return Flashcard(
       id: id ?? this.id,
@@ -48,6 +53,7 @@ class Flashcard extends HiveObject {
       knowledgeLevel: knowledgeLevel ?? this.knowledgeLevel,
       notes: notes ?? this.notes,
       colorIndex: colorIndex ?? this.colorIndex,
+      isCompleted: isCompleted ?? this.isCompleted,
     );
   }
 }

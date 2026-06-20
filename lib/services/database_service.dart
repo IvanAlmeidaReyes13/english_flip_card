@@ -32,8 +32,42 @@ class DatabaseService {
     await _box?.delete(id);
   }
 
-  Future<List<Flashcard>> getAllCards() async {
-    return _box?.values.toList() ?? [];
+  Future<List<Flashcard>> getCards({bool? completed}) async {
+    final cards = _box?.values ?? const Iterable<Flashcard>.empty();
+    if (completed == null) {
+      return cards.toList(growable: false);
+    }
+
+    return cards
+        .where((card) => card.isCompleted == completed)
+        .toList(growable: false);
+  }
+
+  Future<List<Flashcard>> getActiveCards() {
+    return getCards(completed: false);
+  }
+
+  Future<List<Flashcard>> getCompletedCards() {
+    return getCards(completed: true);
+  }
+
+  Future<void> restoreCard(String id) async {
+    final card = await getCard(id);
+    if (card == null) return;
+
+    await updateCard(
+      card.copyWith(
+        knowledgeLevel: 90,
+        isCompleted: false,
+      ),
+    );
+  }
+
+  Future<void> resetCard(String id) async {
+    final card = await getCard(id);
+    if (card == null) return;
+
+    await updateCard(card.copyWith(knowledgeLevel: 0, isCompleted: false));
   }
 
   Future<bool> isEmpty() async {

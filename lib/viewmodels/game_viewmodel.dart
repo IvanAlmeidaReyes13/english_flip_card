@@ -9,6 +9,9 @@ class GameViewModel extends ChangeNotifier {
   String? _errorMessage;
   bool _showTutorial = false;
   bool _animateStreak = false;
+  bool _showMasteryCelebration = false;
+  bool _isAnswering = false;
+  String? _masteredCardLabel;
   bool _tutorialPreferenceLoaded = false;
 
   GameViewModel(this._gameService);
@@ -17,6 +20,9 @@ class GameViewModel extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   bool get showTutorial => _showTutorial;
   bool get animateStreak => _animateStreak;
+  bool get showMasteryCelebration => _showMasteryCelebration;
+  bool get isAnswering => _isAnswering;
+  String? get masteredCardLabel => _masteredCardLabel;
 
   Flashcard? get currentCard => _gameService.currentCard;
   bool get isFlipped => _gameService.isFlipped;
@@ -64,20 +70,36 @@ class GameViewModel extends ChangeNotifier {
   }
 
   Future<void> answer(bool correct) async {
-    if (currentCard == null) return;
+    if (currentCard == null || _isAnswering) return;
 
-    await _gameService.answer(correct);
+    _isAnswering = true;
+    _errorMessage = null;
 
-    if (correct && _gameService.streak >= 5 && _gameService.streak % 5 == 0) {
-      _animateStreak = true;
-      notifyListeners();
-      await Future.delayed(const Duration(milliseconds: 800));
+    try {
+      final result = await _gameService.answer(correct);
+      final shouldAnimateStreak =
+          correct && _gameService.streak >= 5 && _gameService.streak % 5 == 0;
+
+      if (result.becameCompleted || shouldAnimateStreak) {
+        _showMasteryCelebration = result.becameCompleted;
+        _masteredCardLabel = result.card?.english;
+        _animateStreak = shouldAnimateStreak && !result.becameCompleted;
+        notifyListeners();
+        await Future.delayed(
+          Duration(milliseconds: result.becameCompleted ? 1400 : 800),
+        );
+      }
+
+      await _gameService.loadNextCard();
+    } catch (e) {
+      _errorMessage = 'Error al guardar el progreso: $e';
+    } finally {
+      _showMasteryCelebration = false;
+      _masteredCardLabel = null;
       _animateStreak = false;
+      _isAnswering = false;
       notifyListeners();
     }
-
-    await _gameService.loadNextCard();
-    notifyListeners();
   }
 
   Future<void> swipeLeft() async {

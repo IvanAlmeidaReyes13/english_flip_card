@@ -24,7 +24,7 @@ class CardImportService {
       throw const CardImportException();
     }
 
-    final existingCards = await _db.getAllCards();
+    final existingCards = await _db.getCards();
     final existingKeys =
         existingCards
             .map((card) => _duplicateKey(card.english, card.spanish))

@@ -92,59 +92,108 @@ class _CardListViewState extends State<CardListView> {
       ),
       body: Consumer<CardsViewModel>(
         builder: (context, viewModel, child) {
-          if (viewModel.isLoading) {
-            return const AppLoading(message: 'Cargando tarjetas...');
-          }
-
-          if (viewModel.errorMessage != null) {
-            return AppError(
-              message: viewModel.errorMessage!,
-              onRetry: () => viewModel.loadCards(),
-            );
-          }
-
-          if (viewModel.isEmpty) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(
-                      Icons.style_outlined,
-                      size: 64,
-                      color: AppColors.textTertiary,
-                    ),
-                    const SizedBox(height: 16),
-                    Text('No hay tarjetas aún', style: AppTextStyles.heading3),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Añade tu primera tarjeta para comenzar',
-                      style: AppTextStyles.bodyMedium,
-                    ),
-                  ],
+          return Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: SegmentedButton<CardsFilter>(
+                    segments: const [
+                      ButtonSegment(
+                        value: CardsFilter.active,
+                        icon: Icon(Icons.school_outlined),
+                        label: Text('Aprendiendo'),
+                      ),
+                      ButtonSegment(
+                        value: CardsFilter.completed,
+                        icon: Icon(Icons.inventory_2_outlined),
+                        label: Text('Dominadas'),
+                      ),
+                    ],
+                    selected: {viewModel.filter},
+                    onSelectionChanged: (selection) {
+                      viewModel.loadCards(filter: selection.first);
+                    },
+                  ),
                 ),
               ),
-            );
-          }
-
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: viewModel.cards.length,
-            itemBuilder: (context, index) {
-              final card = viewModel.cards[index];
-              return _buildCardItem(context, card, viewModel);
-            },
+              Expanded(child: _buildCardsBody(context, viewModel)),
+            ],
           );
         },
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _navigateToAddCard(context),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add),
-        label: const Text('Añadir Tarjeta'),
+      floatingActionButton: Consumer<CardsViewModel>(
+        builder:
+            (context, viewModel, child) =>
+                viewModel.showingCompleted
+                    ? const SizedBox.shrink()
+                    : FloatingActionButton.extended(
+                      onPressed: () => _navigateToAddCard(context),
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      icon: const Icon(Icons.add),
+                      label: const Text('Añadir Tarjeta'),
+                    ),
       ),
+    );
+  }
+
+  Widget _buildCardsBody(BuildContext context, CardsViewModel viewModel) {
+    if (viewModel.isLoading) {
+      return const AppLoading(message: 'Cargando tarjetas...');
+    }
+
+    if (viewModel.errorMessage != null) {
+      return AppError(
+        message: viewModel.errorMessage!,
+        onRetry: () => viewModel.loadCards(),
+      );
+    }
+
+    if (viewModel.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                viewModel.showingCompleted
+                    ? Icons.inventory_2_outlined
+                    : Icons.style_outlined,
+                size: 64,
+                color: AppColors.textTertiary,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                viewModel.showingCompleted
+                    ? 'Aún no hay tarjetas dominadas'
+                    : 'No hay tarjetas en aprendizaje',
+                style: AppTextStyles.heading3,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                viewModel.showingCompleted
+                    ? 'Las tarjetas que alcancen el 100% aparecerán aquí'
+                    : 'Añade una tarjeta o restaura una dominada',
+                style: AppTextStyles.bodyMedium,
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: viewModel.cards.length,
+      itemBuilder: (context, index) {
+        final card = viewModel.cards[index];
+        return _buildCardItem(context, card, viewModel);
+      },
     );
   }
 
@@ -203,10 +252,28 @@ class _CardListViewState extends State<CardListView> {
           ),
           Column(
             children: [
-              IconButton(
-                icon: const Icon(Icons.edit, color: AppColors.primary),
-                onPressed: () => _navigateToEditCard(context, card),
-              ),
+              if (viewModel.showingCompleted) ...[
+                IconButton(
+                  tooltip: 'Restaurar al 90%',
+                  icon: const Icon(
+                    Icons.unarchive_outlined,
+                    color: AppColors.primary,
+                  ),
+                  onPressed: () => _restoreCard(context, card, viewModel),
+                ),
+                IconButton(
+                  tooltip: 'Reiniciar progreso',
+                  icon: const Icon(
+                    Icons.restart_alt_rounded,
+                    color: AppColors.warning,
+                  ),
+                  onPressed: () => _confirmReset(context, card, viewModel),
+                ),
+              ] else
+                IconButton(
+                  icon: const Icon(Icons.edit, color: AppColors.primary),
+                  onPressed: () => _navigateToEditCard(context, card),
+                ),
               IconButton(
                 icon: const Icon(Icons.delete, color: AppColors.error),
                 onPressed: () => _confirmDelete(context, card, viewModel),
@@ -352,6 +419,50 @@ class _CardListViewState extends State<CardListView> {
                 },
                 style: TextButton.styleFrom(foregroundColor: AppColors.error),
                 child: const Text('Eliminar'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  Future<void> _restoreCard(
+    BuildContext context,
+    Flashcard card,
+    CardsViewModel viewModel,
+  ) async {
+    final restored = await viewModel.restoreCard(card.id);
+    if (!context.mounted || !restored) return;
+    _showSnackBar(context, '"${card.english}" vuelve al 90%');
+  }
+
+  void _confirmReset(
+    BuildContext context,
+    Flashcard card,
+    CardsViewModel viewModel,
+  ) {
+    showDialog(
+      context: context,
+      builder:
+          (dialogContext) => AlertDialog(
+            backgroundColor: AppColors.surface,
+            title: Text('Reiniciar progreso', style: AppTextStyles.heading3),
+            content: Text(
+              '"${card.english}" volverá al 0% y aparecerá de nuevo en el juego.',
+              style: AppTextStyles.bodyMedium,
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Cancelar'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  Navigator.pop(dialogContext);
+                  final reset = await viewModel.resetCard(card.id);
+                  if (!context.mounted || !reset) return;
+                  _showSnackBar(context, '"${card.english}" reiniciada');
+                },
+                child: const Text('Reiniciar'),
               ),
             ],
           ),

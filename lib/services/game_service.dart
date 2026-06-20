@@ -10,6 +10,7 @@ class GameService {
   int _streak = 0;
   int _bestStreak = 0;
   final Set<String> _seenCardIds = {};
+  List<Flashcard> _sessionCards = [];
   bool _sessionComplete = false;
   int _sessionTotalCards = 0;
 
@@ -20,7 +21,8 @@ class GameService {
     _bestStreak = 0;
     _seenCardIds.clear();
     _sessionComplete = false;
-    _sessionTotalCards = (await _db.getAllCards()).length;
+    _sessionCards = await _db.getActiveCards();
+    _sessionTotalCards = _sessionCards.length;
     await loadNextCard();
   }
 
@@ -35,12 +37,10 @@ class GameService {
   }
 
   Future<Flashcard?> _getNextCard() async {
-    final allCards = await _db.getAllCards();
-    _sessionTotalCards = allCards.length;
-    if (allCards.isEmpty) return null;
+    if (_sessionCards.isEmpty) return null;
 
     final unseenCards =
-        allCards.where((c) => !_seenCardIds.contains(c.id)).toList();
+        _sessionCards.where((c) => !_seenCardIds.contains(c.id)).toList();
 
     if (unseenCards.isEmpty) return null;
     final pool = unseenCards;
@@ -79,8 +79,8 @@ class GameService {
     _isFlipped = true;
   }
 
-  Future<void> answer(bool correct) async {
-    if (_currentCard == null) return;
+  Future<GameAnswerResult> answer(bool correct) async {
+    if (_currentCard == null) return const GameAnswerResult();
 
     if (correct) {
       _streak++;
@@ -90,12 +90,20 @@ class GameService {
     }
 
     _seenCardIds.add(_currentCard!.id);
-    await _updateKnowledgeLevel(_currentCard!.id, correct);
+    final becameCompleted = await _updateKnowledgeLevel(
+      _currentCard!.id,
+      correct,
+    );
+
+    return GameAnswerResult(
+      becameCompleted: becameCompleted,
+      card: _currentCard,
+    );
   }
 
-  Future<void> _updateKnowledgeLevel(String id, bool correct) async {
+  Future<bool> _updateKnowledgeLevel(String id, bool correct) async {
     final card = await _db.getCard(id);
-    if (card == null) return;
+    if (card == null) return false;
 
     const maxKnowledgeLevel = 100;
     int newLevel = card.knowledgeLevel;
@@ -106,12 +114,17 @@ class GameService {
       newLevel = (card.knowledgeLevel - 20).clamp(0, maxKnowledgeLevel);
     }
 
-    final updatedCard = card.copyWith(knowledgeLevel: newLevel);
+    final becameCompleted = !card.isCompleted && newLevel >= maxKnowledgeLevel;
+    final updatedCard = card.copyWith(
+      knowledgeLevel: newLevel,
+      isCompleted: card.isCompleted || becameCompleted,
+    );
     await _db.updateCard(updatedCard);
+    return becameCompleted;
   }
 
   Future<void> refreshCards() async {
-    await loadNextCard();
+    await startSession();
   }
 
   Future<bool> isTutorialDismissed() => _db.isTutorialDismissed();
@@ -134,4 +147,11 @@ class GameService {
     if (_sessionComplete) return _sessionTotalCards;
     return (_seenCardIds.length + 1).clamp(1, _sessionTotalCards);
   }
+}
+
+class GameAnswerResult {
+  final bool becameCompleted;
+  final Flashcard? card;
+
+  const GameAnswerResult({this.becameCompleted = false, this.card});
 }
